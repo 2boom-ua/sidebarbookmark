@@ -1,0 +1,80 @@
+{
+    "extensionName": {
+        "message": "Bookmarks"
+    },
+    "extensionDescription": {
+        "message": "Manage your bookmarks in the sidebar"
+    },
+    "searchPlaceholder": {
+        "message": "Search bookmarks..."
+    },
+    "shareTooltip": {
+        "message": "Share link"
+    },
+    "copyTooltip": {
+        "message": "Copy link"
+    },
+    "deleteTooltip": {
+        "message": "Delete"
+    },
+    "renameTooltip": {
+        "message": "Rename"
+    },
+    "renameSuccess": {
+        "message": "Bookmark renamed"
+    },
+    "loadingText": {
+        "message": "Loading bookmarks..."
+    },
+    "nothingFound": {
+        "message": "Nothing found"
+    },
+    "itemDeleted": {
+        "message": "Bookmark deleted"
+    },
+    "copied": {
+        "message": "Copied!"
+    },
+    "searchMinChars": {
+        "message": "Enter 3+ characters to search"
+    },
+    "saveTooltip": {
+        "message": "Save"
+    },
+    "cancelTooltip": {
+        "message": "Cancel"
+    },
+    "bookmarkAdded": {
+        "message": "Bookmark added"
+    },
+    "folderCreated": {
+        "message": "Folder created"
+    },
+    "newFolderPlaceholder": {
+        "message": "Enter folder name..."
+    },
+    "deleteFolderConfirm": {
+        "message": "Delete folder \"{name}\"?"
+    },
+    "deleteFolderCancel": {
+        "message": "Cancel"
+    },
+    "deleteFolderDelete": {
+        "message": "Delete"
+    },
+    "folderDeleted": {
+        "message": "Folder deleted"
+    },
+    "contextCreateFolder": {
+        "message": "Create folder"
+    },
+    "contextAddBookmark": {
+        "message": "Add bookmark"
+    },
+    "contextRenameFolder": {
+        "message": "Rename folder"
+    },
+    "contextDeleteFolder": {
+        "message": "Delete folder"
+    }
+}

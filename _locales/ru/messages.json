@@ -1,0 +1,80 @@
+{
+    "extensionName": {
+        "message": "Закладки"
+    },
+    "extensionDescription": {
+        "message": "Управляйте своими закладками в боковой панели"
+    },
+    "searchPlaceholder": {
+        "message": "Поиск закладок..."
+    },
+    "shareTooltip": {
+        "message": "Поделиться ссылкой"
+    },
+    "copyTooltip": {
+        "message": "Копировать ссылку"
+    },
+    "deleteTooltip": {
+        "message": "Удалить"
+    },
+    "renameTooltip": {
+        "message": "Переименовать"
+    },
+    "renameSuccess": {
+        "message": "Закладка переименована"
+    },
+    "loadingText": {
+        "message": "Загрузка закладок..."
+    },
+    "nothingFound": {
+        "message": "Ничего не найдено"
+    },
+    "itemDeleted": {
+        "message": "Закладка удалена"
+    },
+    "copied": {
+        "message": "Скопировано!"
+    },
+    "searchMinChars": {
+        "message": "Введите 3+ символа для поиска"
+    },
+    "saveTooltip": {
+        "message": "Сохранить"
+    },
+    "cancelTooltip": {
+        "message": "Отменить"
+    },
+    "bookmarkAdded": {
+        "message": "Закладка добавлена"
+    },
+    "folderCreated": {
+        "message": "Папка создана"
+    },
+    "newFolderPlaceholder": {
+        "message": "Введите название папки..."
+    },
+    "deleteFolderConfirm": {
+        "message": "Удалить папку \"{name}\"?"
+    },
+    "deleteFolderCancel": {
+        "message": "Отменить"
+    },
+    "deleteFolderDelete": {
+        "message": "Удалить"
+    },
+    "folderDeleted": {
+        "message": "Папка удалена"
+    },
+    "contextCreateFolder": {
+        "message": "Создать папку"
+    },
+    "contextAddBookmark": {
+        "message": "Добавить закладку"
+    },
+    "contextRenameFolder": {
+        "message": "Переименовать папку"
+    },
+    "contextDeleteFolder": {
+        "message": "Удалить папку"
+    }
+}

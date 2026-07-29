@@ -1,0 +1,80 @@
+{
+    "extensionName": {
+        "message": "Закладки"
+    },
+    "extensionDescription": {
+        "message": "Керуйте своїми закладками в бічній панелі"
+    },
+    "searchPlaceholder": {
+        "message": "Пошук закладок..."
+    },
+    "shareTooltip": {
+        "message": "Поділитись посиланням"
+    },
+    "copyTooltip": {
+        "message": "Копіювати посилання"
+    },
+    "deleteTooltip": {
+        "message": "Видалити"
+    },
+    "renameTooltip": {
+        "message": "Перейменувати"
+    },
+    "renameSuccess": {
+        "message": "Закладку перейменовано"
+    },
+    "loadingText": {
+        "message": "Завантаження закладок..."
+    },
+    "nothingFound": {
+        "message": "Нічого не знайдено"
+    },
+    "itemDeleted": {
+        "message": "Закладку видалено"
+    },
+    "copied": {
+        "message": "Скопійовано!"
+    },
+    "searchMinChars": {
+        "message": "Введіть 3+ символи для пошуку"
+    },
+    "saveTooltip": {
+        "message": "Зберегти"
+    },
+    "cancelTooltip": {
+        "message": "Скасувати"
+    },
+    "bookmarkAdded": {
+        "message": "Закладку додано"
+    },
+    "folderCreated": {
+        "message": "Папку створено"
+    },
+    "newFolderPlaceholder": {
+        "message": "Введіть назву папки..."
+    },
+    "deleteFolderConfirm": {
+        "message": "Видалити папку \"{name}\"?"
+    },
+    "deleteFolderCancel": {
+        "message": "Скасувати"
+    },
+    "deleteFolderDelete": {
+        "message": "Видалити"
+    },
+    "folderDeleted": {
+        "message": "Папку видалено"
+    },
+    "contextCreateFolder": {
+        "message": "Створити папку"
+    },
+    "contextAddBookmark": {
+        "message": "Додати закладку"
+    },
+    "contextRenameFolder": {
+        "message": "Перейменувати папку"
+    },
+    "contextDeleteFolder": {
+        "message": "Видалити папку"
+    }
+}

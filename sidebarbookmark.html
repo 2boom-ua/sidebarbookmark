@@ -1,0 +1,591 @@
+<!-- Sidebar Bookmarks - Chrome/Edge Extension -->
+<!-- Copyright 2boom, 2026 -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+:root {
+    --bg-color: #FAFAFB;
+    --text-color: #202124;
+    --card-bg: #f6f6f6;
+    --card-shadow: none;
+    --input-border: #dadce0;
+    --link-color: #1a73e8;
+    --time-color: #5f6368;
+    --search-bg: #ffffff;
+    --search-text: #5f6368;
+    --search-bg-hover: #f6f6f6;
+    --group-color: #5f6368;
+    --hover-bg: #e2e2e2;
+    --header-color: #202124;
+    --tooltip-bg: #ffffff;
+    --tooltip-text: #5f6368;
+    --icon-filter: brightness(0) saturate(100%) invert(38%) sepia(4%) saturate(472%) hue-rotate(169deg) brightness(93%) contrast(90%);
+    --focus-color: #1a73e8;
+    --focus-shadow: rgba(26, 115, 232, 0.25);
+    --radius-button: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1e1e1e;
+        --text-color: #e8eaed;
+        --card-bg: #2d2e30;
+        --card-shadow: none;
+        --input-border: #5f6368;
+        --link-color: #8ab4f8;
+        --time-color: #9aa0a6;
+        --search-bg: #303134;
+        --search-text: #e8eaed;
+        --search-bg-hover: #3c4043;
+        --group-color: #9aa0a6;
+        --hover-bg: #3c4043;
+        --header-color: #e8eaed;
+        --tooltip-bg: #303134;
+        --tooltip-text: #bdc1c6;
+        --icon-filter: brightness(0) saturate(100%) invert(83%) sepia(4%) saturate(214%) hue-rotate(178deg) brightness(102%) contrast(92%);
+        --focus-color: #8ab4f8;
+        --focus-shadow: rgba(138, 180, 248, 0.25);
+    }
+}
+
+body {
+    font-family: Segoe UI, sans-serif;
+    font-size: 13px;
+    padding: 10px;
+    margin: 0;
+    background: var(--bg-color);
+    color: var(--text-color);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-color);
+    padding: 4px 0;
+}
+
+.search-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--time-color);
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+#search {
+    width: 100%;
+    padding: 10px 30px 8px 38px;
+    border: 2px solid var(--input-border);
+    border-radius: var(--radius-button);
+    background: var(--search-bg);
+    color: var(--search-text);
+    font-size: 13px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+#search:focus {
+    outline: none;
+    border-bottom-color: var(--focus-color);
+    box-shadow: 0 0 0 1px var(--focus-shadow);
+}
+
+#search::placeholder {
+    color: var(--time-color);
+}
+
+#search:hover {
+    background: var(--search-bg-hover);
+}
+
+.clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-color);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.clear-btn.visible {
+    opacity: 0.6;
+    visibility: visible;
+}
+
+.clear-btn:hover {
+    opacity: 0.8 !important;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 16px;
+}
+
+li {
+    margin-bottom: 0;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s ease;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    position: relative;
+    height: 32px;
+    min-height: 32px; 
+    padding: 0 8px;
+    padding-left: 18px;
+}
+
+li:hover {
+    background: var(--hover-bg);
+    border-radius: 4px;
+}
+
+li:hover .action-buttons {
+    display: flex;
+}
+
+.favicon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+.link-container {
+    flex: 1;
+    min-width: 0;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--group-color);
+}
+
+a {
+    text-decoration: none;
+    color: var(--group-color);
+    font-weight: 400;
+}
+
+.action-buttons {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.action-btn {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    position: relative;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.action-btn:hover {
+    opacity: 1;
+}
+
+.action-btn img {
+    width: 15px;
+    height: 15px;
+    display: block;
+    filter: var(--icon-filter);
+}
+
+.action-btn.active {
+    opacity: 1;
+}
+
+.action-btn.active img {
+    opacity: 1;
+}
+
+.tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 4px);
+    right: 0;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    padding: 6px 8px;
+    border-radius: var(--radius-button);
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: opacity 0.2s ease;
+}
+
+.tooltip.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+.url-tooltip {
+    position: absolute;
+    visibility: hidden;
+    opacity: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    padding: 6px 10px;
+    border-radius: var(--radius-button);
+    font-size: 11px;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    font-weight: normal;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.2s ease;
+}
+
+.url-tooltip.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    padding: 8px 16px;
+    border-radius: var(--radius-button);
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.toast.show {
+    opacity: 1;
+}
+
+#loadingIndicator {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    font-size: 13px;
+    color: var(--time-color);
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+    border-radius: var(--radius-button);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--input-border);
+    border-radius: var(--radius-button);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--time-color);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input-border) var(--bg-color);
+}
+
+.group-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--group-color);
+    padding: 0 8px;
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease;
+    height: 32px;
+    min-height: 32px;
+    position: relative;
+    overflow: visible;
+}
+
+.group-header:hover {
+    background: var(--hover-bg);
+    border-radius: 4px;
+}
+
+.group-header .folder-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    filter: var(--icon-filter);
+    margin-right: 6px;
+}
+
+.group-header .folder-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.group-header .folder-new-btn,
+.group-header .add-btn,
+.group-header .sort-btn,
+.group-header .delete-folder-btn, .menu-btn {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 6px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+    position: relative;
+}
+
+.group-header .folder-new-btn img,
+.group-header .add-btn img,
+.group-header .sort-btn img,
+.group-header .delete-folder-btn img, .menu-btn img {
+    width: 16px;
+    height: 16px;
+    display: block;
+    filter: var(--icon-filter);
+}
+
+.group-header .folder-new-btn:hover,
+.group-header .add-btn:hover,
+.group-header .sort-btn:hover,
+.group-header .delete-folder-btn:hover, .menu-btn:hover {
+    opacity: 1;
+}
+
+.group-header .sort-btn, .menu-btn {
+    font-size: 0;
+    line-height: 0;
+    text-indent: -9999px;
+}
+
+.group-container[data-collapsed="true"] .group-header .folder-new-btn,
+.group-container[data-collapsed="true"] .group-header .add-btn,
+.group-container[data-collapsed="true"] .group-header .sort-btn,
+.group-container[data-collapsed="true"] .group-header .delete-folder-btn {
+    display: none;
+}
+
+.group-container:not([data-collapsed="true"]) .group-header .sort-btn {
+    opacity: 0.8;
+}
+
+.group-container:not([data-collapsed="true"]) .group-header .sort-btn:hover {
+    opacity: 1;
+}
+
+.group-container:not([data-collapsed="true"]) .group-header .sort-btn.active {
+    opacity: 1;
+}
+
+.group-container[data-collapsed="true"] .group-header .sort-btn {
+    display: none;
+}
+
+.group-container[data-collapsed="true"] .group-items {
+    display: none;
+}
+
+.group-container {
+    margin-bottom: 0;
+}
+
+.group-container:first-child .group-header {
+    margin-top: 0;
+}
+
+.group-container:not(:first-child) {
+    margin-top: 0;
+}
+
+.group-header .delete-folder-btn.confirm-mode {
+    opacity: 1;
+}
+
+.group-header .folder-new-btn {
+    order: 2;
+}
+.group-header .add-btn {
+    order: 3;
+}
+.group-header .sort-btn {
+    order: 4;
+}
+.group-header .delete-folder-btn {
+    order: 5;
+}
+
+.group-header .menu-btn {
+    order: 6;
+}
+
+.group-header .folder-new-btn,
+.group-header .add-btn,
+.group-header .sort-btn,
+.group-header .delete-folder-btn,
+.group-header .menu-btn {
+    margin-left: 2px;
+}
+
+li.editing-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.edit-input {
+    cursor: text;
+}
+
+.edit-input,
+.edit-input:focus,
+.edit-input:-webkit-autofill,
+.edit-input:-webkit-autofill:hover,
+.edit-input:-webkit-autofill:focus {
+    background: var(--search-bg) !important;
+    color: var(--search-text) !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--search-bg) inset !important;
+    -webkit-text-fill-color: var(--search-text) !important;
+    caret-color: var(--search-text) !important;
+}
+
+.context-menu {
+    display: none;
+    position: fixed;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    border-radius: var(--radius-button);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    padding: 6px 0;
+    min-width: 160px;
+    z-index: 99999;
+    border: 1px solid var(--input-border);
+}
+
+.context-menu.active {
+    display: block;
+}
+
+.context-menu .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-color);
+    transition: background 0.15s ease;
+    user-select: none;
+}
+
+.context-menu .menu-item:hover {
+    background: var(--hover-bg);
+}
+
+.context-menu .menu-item img {
+    width: 16px;
+    height: 16px;
+    filter: var(--icon-filter);
+}
+
+.context-menu .menu-item.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.context-menu .menu-divider {
+    height: 1px;
+    background: var(--input-border);
+    margin: 4px 12px;
+}
+  </style>
+</head>
+<body>
+  <div class="search-container">
+    <div class="search-wrapper">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" id="search" placeholder="">
+      <button class="clear-btn" id="clearSearchBtn">✕</button>
+    </div>
+  </div>
+  <ul id="history-list"></ul>
+  <div class="context-menu" id="contextMenu"></div>
+  <div id="loadingIndicator"></div>
+  <div id="toast" class="toast"></div>
+
+  <script src="sidebarbookmark.js"></script>
+</body>
+</html>
