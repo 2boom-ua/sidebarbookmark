@@ -10,6 +10,9 @@ var folderSortModes = {};
 var refreshDebounceTimer = null;
 var cachedFolderIds = {};
 
+var cachedBookmarksHash = null;
+var lastQuery = '';
+
 function getMessage(key) {
     var result = chrome.i18n.getMessage(key);
     if (!result) {
@@ -42,6 +45,12 @@ function getMessage(key) {
         return fallback[key] || key;
     }
     return result;
+}
+
+function getBookmarksHash() {
+    return JSON.stringify(cachedBookmarkItems.map(function(item) {
+        return item.id + item.title + item.url + item.dateAdded;
+    }));
 }
 
 // Cached bookmark items
@@ -134,6 +143,9 @@ function loadBookmarksToCache() {
 
             console.log('loadBookmarksToCache: allBookmarks length:', allBookmarks.length);
             cachedBookmarkItems = allBookmarks;
+            cachedFolderIds = folderIds;
+            //cachedBookmarksHash = getBookmarksHash();
+            console.log('loadBookmarksToCache: folderIds:', Object.keys(folderIds));
             cachedFolderIds = folderIds;
             console.log('loadBookmarksToCache: folderIds:', Object.keys(folderIds));
             resolve(allBookmarks);
@@ -577,7 +589,7 @@ function saveSortModes() {
 
 // Get next sort mode
 function getNextSortMode(currentMode) {
-    var modes = ['chrome', 'newest', 'az', 'za'];
+    var modes = ['chrome', 'oldest', 'az', 'za'];
     var currentIndex = modes.indexOf(currentMode);
     if (currentIndex === -1 || currentIndex === modes.length - 1) {
         return modes[0];
@@ -589,7 +601,7 @@ function getNextSortMode(currentMode) {
 function getSortIconPath(mode) {
     var icons = {
         'chrome': 'icons/sort-default.svg',
-        'newest': 'icons/sort-newest.svg',
+        'oldest': 'icons/sort-oldest.svg',
         'az': 'icons/sort-az.svg',
         'za': 'icons/sort-za.svg'
     };
@@ -604,9 +616,9 @@ function sortBookmarks(bookmarks, mode) {
     
     var sorted = bookmarks.slice();
     
-    if (mode === 'newest') {
+    if (mode === 'oldest') {
         sorted.sort(function(a, b) {
-            return b.dateAdded - a.dateAdded;
+            return a.dateAdded - b.dateAdded;
         });
     } else if (mode === 'az') {
         sorted.sort(function(a, b) {
