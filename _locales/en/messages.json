@@ -76,5 +76,17 @@
     },
     "contextDeleteFolder": {
         "message": "Delete folder"
+    },
+    "systemUrlError": {
+        "message": "Cannot add system page"
+    },
+    "deduplicateMenuItem": {
+        "message": "Deduplicate"
+    },
+    "deduplicateComplete": {
+        "message": "Deleted {count} duplicates"
+    },
+    "noDuplicatesFound": {
+        "message": "No duplicates found"
     }
 }

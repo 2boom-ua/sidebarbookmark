@@ -40,7 +40,11 @@ function getMessage(key) {
             'contextCreateFolder': 'Create folder',
             'contextAddBookmark': 'Add bookmark',
             'contextRenameFolder': 'Rename folder',
-            'contextDeleteFolder': 'Delete folder'
+            'contextDeleteFolder': 'Delete folder',
+            'systemUrlError': 'Cannot add system page',
+            'deduplicateMenuItem': 'Deduplicate',
+            'deduplicateComplete': 'Deleted {count} duplicates',
+            'noDuplicatesFound': 'No duplicates found'
         };
         return fallback[key] || key;
     }
@@ -61,10 +65,8 @@ var filteredBookmarkItems = [];
 
 // Function to load bookmarks into cache
 function loadBookmarksToCache() {
-    console.log('loadBookmarksToCache called');
     return new Promise(function(resolve, reject) {
         chrome.bookmarks.getTree(function(tree) {
-            console.log('loadBookmarksToCache: got tree');
             if (chrome.runtime.lastError) {
                 console.error('loadBookmarksToCache error:', chrome.runtime.lastError);
                 reject(chrome.runtime.lastError);
@@ -75,9 +77,7 @@ function loadBookmarksToCache() {
             var allBookmarks = [];
             var folderIds = {};
             function traverse(nodes, path) {
-                console.log('traverse: path:', path, 'nodes length:', nodes.length);
                 nodes.forEach(function(node) {
-                    console.log('traverse node:', node.id, node.title, 'url:', !!node.url, 'children:', !!node.children);
                     
                     // Store folder ID for all folders
                     if (node.children) {
@@ -100,14 +100,12 @@ function loadBookmarksToCache() {
                         }
                         if (currentPath) {
                             folderIds[currentPath] = node.id;
-                            console.log('  -> stored folder ID:', node.id, 'for path:', currentPath);
                         }
                     }
                     
                     if (node.url) {
                         node.folderPath = path;
                         allBookmarks.push(node);
-                        console.log('  -> added bookmark:', node.title, 'url:', node.url);
                     }
                     
                     if (node.children) {
@@ -128,26 +126,15 @@ function loadBookmarksToCache() {
                             var rootName = rootNames[node.id];
                             newPath = path ? path + '/' + rootName : rootName;
                         }
-                        console.log('  -> traversing children with path:', newPath);
                         traverse(node.children, newPath);
                     }
                 });
             }
             traverse(tree, '');
-            console.log('traverse done');
 
-            // Sort by dateAdded descending
-            //allBookmarks.sort(function(a, b) {
-            //    return b.dateAdded - a.dateAdded;
-            //});
-
-            console.log('loadBookmarksToCache: allBookmarks length:', allBookmarks.length);
             cachedBookmarkItems = allBookmarks;
             cachedFolderIds = folderIds;
-            //cachedBookmarksHash = getBookmarksHash();
-            console.log('loadBookmarksToCache: folderIds:', Object.keys(folderIds));
             cachedFolderIds = folderIds;
-            console.log('loadBookmarksToCache: folderIds:', Object.keys(folderIds));
             resolve(allBookmarks);
         });
     });
@@ -191,6 +178,7 @@ function showToast(message) {
 
 // Position tooltip
 function positionTooltip(element, tooltip) {
+    if (!element || !tooltip) return;
     var rect = element.getBoundingClientRect();
     var tooltipHeight = tooltip.offsetHeight || 30;
     var spaceBelow = window.innerHeight - rect.bottom;
@@ -638,11 +626,8 @@ function sortBookmarks(bookmarks, mode) {
 }
 
 function renderBookmarks(items, listElement) {
-    console.log('renderBookmarks called with items:', items.length);
-    console.log('Items sample:', items.slice(0, 3));
     listElement.innerHTML = '';
     
-    // Group items by folder path
     var groups = {};
     items.forEach(function(item) {
         var folderPath = item.folderPath || 'Без папки';
@@ -652,88 +637,119 @@ function renderBookmarks(items, listElement) {
         groups[folderPath].push(item);
     });
     
-    // Add empty folders from cachedFolderIds
     Object.keys(cachedFolderIds).forEach(function(folderPath) {
         if (!groups[folderPath]) {
             groups[folderPath] = [];
         }
     });
 
-    // Filter out system folders with 0 items, keep all other folders
     var filteredGroups = {};
     Object.keys(groups).forEach(function(key) {
         var folderId = cachedFolderIds[key];
         var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
         if (groups[key].length > 0 || !isSystemFolder) {
             filteredGroups[key] = groups[key];
-        } else {
-            console.log('  -> Hiding folder:', key);
         }
     });
     groups = filteredGroups;
-    console.log('Final groups:', Object.keys(groups));
 
-// Filter subfolders based on parent folder state
-var visibleGroups = {};
-Object.keys(groups).forEach(function(key) {
-    var folderId = cachedFolderIds[key];
-    var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
-    
-    // Always show system folders
-    if (isSystemFolder) {
-        visibleGroups[key] = groups[key];
-        return;
-    }
-    
-    // Check if this is a subfolder
-    var pathParts = key.split('/');
-    if (pathParts.length > 1) {
-        var parentPath = pathParts.slice(0, -1).join('/');
-        // Check all ancestors up the chain
-        var isParentExpanded = true;
-        var currentPath = parentPath;
-        while (currentPath) {
-            if (collapsedFolders[currentPath] === true) {
-                isParentExpanded = false;
-                break;
-            }
-            var parts = currentPath.split('/');
-            if (parts.length <= 1) {
-                break;
-            }
-            currentPath = parts.slice(0, -1).join('/');
+    var visibleGroups = {};
+    Object.keys(groups).forEach(function(key) {
+        var folderId = cachedFolderIds[key];
+        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
+        
+        if (isSystemFolder) {
+            visibleGroups[key] = groups[key];
+            return;
         }
         
-        if (isParentExpanded) {
-            visibleGroups[key] = groups[key];
+        var pathParts = key.split('/');
+        if (pathParts.length > 1) {
+            var parentPath = pathParts.slice(0, -1).join('/');
+            var isParentExpanded = true;
+            var currentPath = parentPath;
+            while (currentPath) {
+                if (collapsedFolders[currentPath] === true) {
+                    isParentExpanded = false;
+                    break;
+                }
+                var parts = currentPath.split('/');
+                if (parts.length <= 1) {
+                    break;
+                }
+                currentPath = parts.slice(0, -1).join('/');
+            }
+            
+            if (isParentExpanded) {
+                visibleGroups[key] = groups[key];
+            }
         } else {
-            console.log('  -> Hiding subfolder (ancestor collapsed):', key);
+            visibleGroups[key] = groups[key];
         }
-    } else {
-        // Root folders always show
-        visibleGroups[key] = groups[key];
-    }
-});
-groups = visibleGroups;
-    console.log('Final visible groups:', Object.keys(groups));
+    });
+    groups = visibleGroups;
 
-    // Sort groups by folder name
     var sortedGroupKeys = Object.keys(groups).sort();
 
-    // Render groups
     sortedGroupKeys.forEach(function(groupKey) {
-        // Group container
         var groupContainer = document.createElement('div');
         groupContainer.className = 'group-container';
         groupContainer.dataset.folder = groupKey;
         
-        // Group header with folder icon
         var header = document.createElement('div');
         header.className = 'group-header';
         header.style.cursor = 'pointer';
+        
+        var folderId = cachedFolderIds[groupKey];
+        
+        var fullName = groupKey.replace(/\//g, ' ▸ ');
+        var parts = fullName.split(' ▸ ');
+        var folderTooltip = null;
+        if (parts.length > 3) {
+            folderTooltip = document.createElement('span');
+            folderTooltip.className = 'url-tooltip';
+            folderTooltip.textContent = fullName;
+            header.appendChild(folderTooltip);
+        }
 
-        // Folder icon
+        if (folderTooltip) {           
+            function showFolderTooltip() {
+                if (tooltipTimer) {
+                    clearTimeout(tooltipTimer);
+                    tooltipTimer = null;
+                }
+                positionTooltip(header, folderTooltip);
+                folderTooltip.classList.add('show');
+            }
+            
+            function hideFolderTooltip() {
+                if (tooltipTimer) {
+                    clearTimeout(tooltipTimer);
+                    tooltipTimer = null;
+                }
+                folderTooltip.classList.remove('show');
+            }
+            
+            header.addEventListener('mouseenter', function(e) {
+                e.stopPropagation();
+                tooltipTimer = setTimeout(function() {
+                    showFolderTooltip();
+                }, 400);
+            });
+            
+            header.addEventListener('mouseleave', function(e) {
+                e.stopPropagation();
+                hideFolderTooltip();
+            });
+        }
+
         var folderImg = document.createElement('img');
+        
+        var toggleSymbol = document.createElement('span');
+        toggleSymbol.className = 'toggle-symbol';
+        var isCollapsed = collapsedFolders[groupKey] === true;
+        toggleSymbol.classList.add(isCollapsed ? 'closed' : 'open');
+        
         if (groupKey === 'Favorites bar' || groupKey === 'Bookmarks bar' || folderId === '1' || groupKey.startsWith('Favorites bar/') || groupKey.startsWith('Bookmarks bar/')) {
             folderImg.src = 'icons/star.svg';
             folderImg.alt = 'Favorites';
@@ -748,14 +764,17 @@ groups = visibleGroups;
             folderImg.alt = 'Folder';
         }
         folderImg.className = 'folder-icon';
-        folderImg.style.cssText = 'width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px; filter: var(--icon-filter);';
+        folderImg.style.cssText = 'width: 17px; height: 17px; display: inline-block; vertical-align: middle; margin-right: 6px; filter: var(--icon-filter);';
 
-        // Folder name
         var folderNameSpan = document.createElement('span');
         folderNameSpan.className = 'folder-name';
-        folderNameSpan.textContent = groupKey;
+        var displayName = groupKey.replace(/\//g, ' ▸ ');
+        var parts = displayName.split(' ▸ ');
+        if (parts.length > 3) {
+            displayName = parts[0] + ' ▸ ... ▸ ' + parts[parts.length - 1];
+        }
+        folderNameSpan.textContent = displayName;
 
-        // Folder new button (hidden, used for context menu)
         var folderNewBtn = document.createElement('button');
         folderNewBtn.className = 'folder-new-btn';
         folderNewBtn.style.display = 'none';
@@ -775,12 +794,10 @@ groups = visibleGroups;
             var sortBtn = header.querySelector('.sort-btn');
             var folderNewBtn = header.querySelector('.folder-new-btn');
             
-            // Hide buttons
             if (addBtn) addBtn.style.display = 'none';
             if (sortBtn) sortBtn.style.display = 'none';
             if (folderNewBtn) folderNewBtn.style.display = 'none';
 
-            // Disable all other folders
             document.querySelectorAll('.group-container').forEach(function(otherContainer) {
                 if (otherContainer !== container) {
                     otherContainer.classList.add('editing-disabled');
@@ -790,7 +807,6 @@ groups = visibleGroups;
             var oldName = folderNameSpan.textContent;
             var folderPath = container.dataset.folder;
             
-            // Find folder ID by path
             var folderId = null;
             for (var i = 0; i < cachedBookmarkItems.length; i++) {
                 var item = cachedBookmarkItems[i];
@@ -813,7 +829,6 @@ groups = visibleGroups;
                 }
             }
             
-            // Create input
             var input = document.createElement('input');
             input.type = 'text';
             input.className = 'edit-input';
@@ -827,7 +842,6 @@ groups = visibleGroups;
             folderNameSpan.innerHTML = '';
             folderNameSpan.appendChild(input);
             
-            // Create edit buttons
             var editButtons = document.createElement('span');
             editButtons.className = 'action-buttons';
             editButtons.style.display = 'flex';
@@ -878,15 +892,12 @@ groups = visibleGroups;
                     return;
                 }
                 
-                // Remove editing-disabled from all containers
                 document.querySelectorAll('.group-container.editing-disabled').forEach(function(el) {
                     el.classList.remove('editing-disabled');
                 });
                 
-                // Find folder ID from cachedFolderIds
                 var targetFolderId = cachedFolderIds[folderPath];
                 if (targetFolderId) {
-                    // Close the input field immediately
                     var container = document.querySelector('.group-container[data-folder="' + folderPath + '"]');
                     if (container) {
                         var header = container.querySelector('.group-header');
@@ -895,23 +906,19 @@ groups = visibleGroups;
                         var sortBtn = header.querySelector('.sort-btn');
                         var folderNewBtn = header.querySelector('.folder-new-btn');
                         
-                        // Restore folder name
                         folderNameSpan.innerHTML = '';
                         folderNameSpan.textContent = oldName;
                         
-                        // Show buttons
                         if (addBtn) addBtn.style.display = '';
                         if (sortBtn) sortBtn.style.display = '';
                         if (folderNewBtn) folderNewBtn.style.display = '';
                         
-                        // Remove edit buttons
                         var editButtons = container.querySelector('.action-buttons');
                         if (editButtons) editButtons.remove();
                     }
                     
                     createFolder(targetFolderId, name);
                 } else {
-                    console.log('No matching folder found for path:', folderPath);
                     cancelNewFolder();
                 }
             }
@@ -928,7 +935,6 @@ groups = visibleGroups;
                     folderNameSpan.innerHTML = '';
                     folderNameSpan.textContent = oldName;
                     
-                    // Remove editing-disabled from all containers
                     document.querySelectorAll('.group-container.editing-disabled').forEach(function(el) {
                         el.classList.remove('editing-disabled');
                     });
@@ -970,8 +976,6 @@ groups = visibleGroups;
             });
         });
 
-        // Delete folder button (hidden, used for context menu)
-        var folderId = cachedFolderIds[groupKey];
         var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
         var deleteBtn = null;
         
@@ -1002,7 +1006,7 @@ groups = visibleGroups;
             
             });
         }
-        // Add button (hidden, used for context menu)
+        
         var addBtn = document.createElement('button');
         addBtn.className = 'add-btn';
         addBtn.style.display = 'none';
@@ -1017,19 +1021,14 @@ groups = visibleGroups;
             var container = this.closest('.group-container');
             var folderPath = container.dataset.folder;
             
-            // Find folder ID from cachedFolderIds
             var folderId = cachedFolderIds[folderPath];
             if (folderId) {
                 addBookmarkToFolder(folderId);
-            } else {
-                console.log('No matching folder found for path:', folderPath);
             }
         });
 
-        // Sort button (visible)
         var sortBtn = document.createElement('button');
         sortBtn.className = 'sort-btn';
-        var folderId = cachedFolderIds[groupKey];
         var currentMode = folderSortModes[groupKey] || 'chrome';
         sortBtn.classList.add('active');
         
@@ -1041,14 +1040,11 @@ groups = visibleGroups;
         
         sortBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            console.log('Sort button clicked');
             var container = this.closest('.group-container');
             var folderKey = container.dataset.folder;
             var currentMode = folderSortModes[folderKey] || 'chrome';
             var nextMode = getNextSortMode(currentMode);
             var icon = this.querySelector('img');
-            
-            console.log('Current mode:', currentMode, 'Next mode:', nextMode);
             
             if (nextMode === 'chrome') {
                 delete folderSortModes[folderKey];
@@ -1067,7 +1063,6 @@ groups = visibleGroups;
             displayBookmarks(searchQuery);
         });
 
-        // Menu button (visible)
         var menuBtn = document.createElement('button');
         menuBtn.className = 'menu-btn';
         var menuIcon = document.createElement('img');
@@ -1088,6 +1083,7 @@ groups = visibleGroups;
             showContextMenu(rect.left, rect.bottom, folderPath, folderId, isSystemFolder, folderName, container);
         });
 
+        header.appendChild(toggleSymbol);
         header.appendChild(folderImg);
         header.appendChild(folderNameSpan);
         if (folderNewBtn) {
@@ -1107,7 +1103,6 @@ groups = visibleGroups;
         }
         groupContainer.appendChild(header);
         
-        // Context menu
         header.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1121,23 +1116,17 @@ groups = visibleGroups;
             showContextMenu(e.clientX, e.clientY, folderPath, folderId, isSystemFolder, folderName, container);
         });
 
-        // Items container
         var itemsContainer = document.createElement('div');
         itemsContainer.className = 'group-items';
         
-        // Get sort mode for this folder
         var sortMode = folderSortModes[groupKey] || 'chrome';
-        
-        // Sort items
         var sortedItems = sortBookmarks(groups[groupKey], sortMode);
         
-        // Render items in this group
         sortedItems.forEach(function(item) {
             var li = createBookmarkItem(item);
             itemsContainer.appendChild(li);
         });
         
-        // Apply collapsed state before appending items container
         if (collapsedFolders[groupKey] === true) {
             itemsContainer.style.display = 'none';
             groupContainer.dataset.collapsed = 'true';
@@ -1148,109 +1137,105 @@ groups = visibleGroups;
         
         groupContainer.appendChild(itemsContainer);
         listElement.appendChild(groupContainer);
-        
-    // Toggle collapse on header click
-header.addEventListener('click', function(e) {
-    // Block click if editing folder
-    if (editingBookmarkId !== null && editingBookmarkId.toString().startsWith('folder-')) {
-        e.stopPropagation();
-        return;
-    }
-    e.stopPropagation();
-    var container = this.parentElement;
-    var items = container.querySelector('.group-items');
-    var folderName = container.dataset.folder;
-    var icon = container.querySelector('.folder-icon');
-    
-    // Store for saving subfolder states
-    var savedSubfolderStates = {};
-    
-    function saveSubfoldersState(parentPath) {
-        for (var key in collapsedFolders) {
-            if (key.startsWith(parentPath + '/') && key !== parentPath) {
-                savedSubfolderStates[key] = collapsedFolders[key];
-                saveSubfoldersState(key);
+
+        header.addEventListener('click', function(e) {
+            if (editingBookmarkId !== null && editingBookmarkId.toString().startsWith('folder-')) {
+                e.stopPropagation();
+                return;
             }
-        }
-    }
-    
-    function restoreSubfoldersState(parentPath) {
-        for (var key in savedSubfolderStates) {
-            if (key.startsWith(parentPath + '/') && key !== parentPath) {
-                collapsedFolders[key] = savedSubfolderStates[key];
-                restoreSubfoldersState(key);
+            e.stopPropagation();
+            var container = this.parentElement;
+            var items = container.querySelector('.group-items');
+            var folderName = container.dataset.folder;
+            var icon = container.querySelector('.folder-icon');
+            
+            var savedSubfolderStates = {};
+
+            if (!container) return;
+            
+            var symbol = container.querySelector('.toggle-symbol');
+            if (symbol) {
+                symbol.classList.remove('closed', 'open');
+                symbol.classList.add(collapsedFolders[folderName] ? 'closed' : 'open');
             }
-        }
-    }
-    
-    function setSubfoldersState(parentPath, state) {
-        for (var key in cachedFolderIds) {
-            if (key.startsWith(parentPath + '/') && key !== parentPath) {
-                collapsedFolders[key] = state;
-                setSubfoldersState(key, state);
+            
+            function saveSubfoldersState(parentPath) {
+                for (var key in collapsedFolders) {
+                    if (key.startsWith(parentPath + '/') && key !== parentPath) {
+                        savedSubfolderStates[key] = collapsedFolders[key];
+                        saveSubfoldersState(key);
+                    }
+                }
             }
-        }
-    }
-    
-    if (items.style.display === 'none') {
-        items.style.display = '';
-        container.dataset.collapsed = 'false';
-        collapsedFolders[folderName] = false;
-        if (icon && folderName !== 'Favorites bar' && folderName !== 'Bookmarks bar') {
-            icon.src = 'icons/folder-open.svg';
-        }
-        
-        // Restore subfolder states
-        restoreSubfoldersState(folderName);
-    } else {
-        // Save current subfolder states before collapsing
-        saveSubfoldersState(folderName);
-        
-        items.style.display = 'none';
-        container.dataset.collapsed = 'true';
-        collapsedFolders[folderName] = true;
-        if (icon && folderName !== 'Favorites bar' && folderName !== 'Bookmarks bar') {
-            icon.src = 'icons/folder.svg';
-        }
-        
-        // Collapse all subfolders
-        setSubfoldersState(folderName, true);
-    }
-    saveCollapsedState();
-    
-    // Re-render to show/hide subfolders
-    var searchQuery = document.getElementById('search').value;
-    displayBookmarks(searchQuery);
-});
-    
-    // Track active folder when clicking on links inside folder
-    itemsContainer.querySelectorAll('a').forEach(function(link) {
-        link.addEventListener('click', function(e) {
-            document.querySelectorAll('.group-header.active-folder').forEach(function(el) {
-                el.classList.remove('active-folder');
-            });
-            header.classList.add('active-folder');
+            
+            function restoreSubfoldersState(parentPath) {
+                for (var key in savedSubfolderStates) {
+                    if (key.startsWith(parentPath + '/') && key !== parentPath) {
+                        collapsedFolders[key] = savedSubfolderStates[key];
+                        restoreSubfoldersState(key);
+                    }
+                }
+            }
+            
+            function setSubfoldersState(parentPath, state) {
+                for (var key in cachedFolderIds) {
+                    if (key.startsWith(parentPath + '/') && key !== parentPath) {
+                        collapsedFolders[key] = state;
+                        setSubfoldersState(key, state);
+                    }
+                }
+            }
+            
+            if (items.style.display === 'none') {
+                items.style.display = '';
+                container.dataset.collapsed = 'false';
+                collapsedFolders[folderName] = false;
+                if (icon && folderName !== 'Favorites bar' && folderName !== 'Bookmarks bar') {
+                    icon.src = 'icons/folder-open.svg';
+                }
+                
+                restoreSubfoldersState(folderName);
+            } else {
+                saveSubfoldersState(folderName);
+                
+                items.style.display = 'none';
+                container.dataset.collapsed = 'true';
+                collapsedFolders[folderName] = true;
+                if (icon && folderName !== 'Favorites bar' && folderName !== 'Bookmarks bar') {
+                    icon.src = 'icons/folder.svg';
+                }
+                
+                setSubfoldersState(folderName, true);
+            }
+            saveCollapsedState();
+            
+            var searchQuery = document.getElementById('search').value;
+            displayBookmarks(searchQuery);
         });
-    });
+        
+        itemsContainer.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                document.querySelectorAll('.group-header.active-folder').forEach(function(el) {
+                    el.classList.remove('active-folder');
+                });
+                header.classList.add('active-folder');
+            });
+        });
     });
 }
 
 // Function to load and display bookmarks
 function loadBookmarks(query = '') {
-    console.log('loadBookmarks called with query:', query);
     const listElement = document.getElementById('history-list');
     const loadingIndicator = document.getElementById('loadingIndicator');
     
     // Load collapsed state and sort modes from storage first
     Promise.all([loadCollapsedState(), loadSortModes()]).then(function() {
-        console.log('loadBookmarks: cachedBookmarkItems.length:', cachedBookmarkItems.length);
         if (cachedBookmarkItems.length === 0) {
-            console.log('loadBookmarks: loading bookmarks to cache...');
             listElement.innerHTML = '';
             loadingIndicator.style.display = 'block';
             loadingIndicator.textContent = getMessage('loadingText');
             loadBookmarksToCache().then(function() {
-                console.log('loadBookmarks: loadBookmarksToCache done, items:', cachedBookmarkItems.length);
                 displayBookmarks(query);
                 loadingIndicator.style.display = 'none';
             }).catch(function(error) {
@@ -1259,7 +1244,6 @@ function loadBookmarks(query = '') {
                 listElement.innerHTML = '<li>Error loading bookmarks</li>';
             });
         } else {
-            console.log('loadBookmarks: using cached items');
             displayBookmarks(query);
         }
     });
@@ -1573,8 +1557,6 @@ function getBookmarksHash() {
 }
 
 function displayBookmarks(query) {
-    console.log('displayBookmarks called with query:', query);
-    console.log('cachedBookmarkItems length:', cachedBookmarkItems.length);
     
     // Save current collapsed state before re-render
     document.querySelectorAll('.group-container').forEach(function(container) {
@@ -1621,6 +1603,10 @@ function addBookmarkToFolder(parentId) {
             return;
         }
         var tab = tabs[0];
+            if (isSystemUrl(tab.url)) {
+            showToast(getMessage('systemUrlError'));
+            return;
+        }
         chrome.bookmarks.create({
             parentId: parentId,
             title: tab.title,
@@ -1725,7 +1711,12 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
             id: 'rename-folder',
             icon: 'icons/rename.svg',
             label: getMessage('contextRenameFolder')
-        }
+        },
+        {
+            id: 'deduplicate',
+            icon: 'icons/dedup.svg',
+            label: getMessage('deduplicateMenuItem')
+        },
     ];
     
     // Add delete option only for non-system folders
@@ -1743,7 +1734,7 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
         var div = document.createElement('div');
         div.className = 'menu-item';
         div.dataset.action = item.id;
-        div.dataset.folderPath = folderPath;
+        div.dataset.folderPath = folderPath || '';
         div.dataset.folderId = folderId;
         div.dataset.folderName = folderName;
         
@@ -1774,6 +1765,9 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
                     break;
                 case 'delete-folder':
                     handleDeleteFolder(container);
+                    break;
+                case 'deduplicate':
+                    handleDeduplicate(container);
                     break;
             }
             closeContextMenu();
@@ -1851,38 +1845,41 @@ function handleAddBookmark(container) {
 }
 
 function handleRenameFolder(container) {
-    if (!container) return;
+    if (!container) {
+        console.error('handleRenameFolder: container is null');
+        return;
+    }
     
-    // Block if already editing
     if (editingBookmarkId !== null) {
+        return;
+    }
+    
+    var folderPath = container.dataset.folder;
+    if (!folderPath) {
+        console.error('handleRenameFolder: folderPath is undefined');
         return;
     }
     
     var header = container.querySelector('.group-header');
     var folderNameSpan = header.querySelector('.folder-name');
-    var oldName = folderNameSpan.textContent;
-    var folderPath = container.dataset.folder;
+    var oldName = folderPath.substring(folderPath.lastIndexOf('/') + 1);
     var folderId = cachedFolderIds[folderPath];
     
     if (!folderId) return;
     
-    // Set editing state
     editingBookmarkId = 'folder-' + folderId;
     
-    // Hide sort button and menu button
     var sortBtn = header.querySelector('.sort-btn');
     var menuBtn = header.querySelector('.menu-btn');
     if (sortBtn) sortBtn.style.display = 'none';
     if (menuBtn) menuBtn.style.display = 'none';
     
-    // Disable all other containers
     document.querySelectorAll('.group-container').forEach(function(otherContainer) {
         if (otherContainer !== container) {
             otherContainer.classList.add('editing-disabled');
         }
     });
     
-    // Create input
     var input = document.createElement('input');
     input.type = 'text';
     input.className = 'edit-input';
@@ -1896,7 +1893,6 @@ function handleRenameFolder(container) {
     folderNameSpan.innerHTML = '';
     folderNameSpan.appendChild(input);
     
-    // Create edit buttons
     var editButtons = document.createElement('span');
     editButtons.className = 'action-buttons';
     editButtons.style.display = 'flex';
@@ -1955,7 +1951,6 @@ function handleRenameFolder(container) {
             }
             showToast(getMessage('renameSuccess'));
             
-            // Remove old path from cachedFolderIds and add new one
             var oldPath = folderPath;
             var newPath = folderPath.substring(0, folderPath.lastIndexOf('/') + 1) + newName;
             if (cachedFolderIds[oldPath]) {
@@ -1983,7 +1978,7 @@ function handleRenameFolder(container) {
             var menuBtn = header.querySelector('.menu-btn');
             
             folderNameSpan.innerHTML = '';
-            folderNameSpan.textContent = oldName;
+            folderNameSpan.textContent = oldName.replace(/\//g, ' ▸ ');
             
             if (sortBtn) sortBtn.style.display = '';
             if (menuBtn) menuBtn.style.display = '';
@@ -2021,14 +2016,11 @@ function handleRenameFolder(container) {
         }
     });
     
-    // Click outside to cancel - like in bookmark editing
     function handleOutsideClick(e) {
         var target = e.target;
-        // Don't cancel if clicking on save/cancel buttons or input
         if (target === input || target.closest('.action-btn') || target.closest('.edit-input')) {
             return;
         }
-        // Don't cancel if clicking on bookmark editing elements
         if (target.closest('li') && target.closest('li').querySelector('.edit-input')) {
             return;
         }
@@ -2037,10 +2029,6 @@ function handleRenameFolder(container) {
             document.removeEventListener('click', handleOutsideClick);
         }
     }
-    
-    setTimeout(function() {
-        document.addEventListener('click', handleOutsideClick);
-    }, 0);
     
     setTimeout(function() {
         document.addEventListener('click', handleOutsideClick);
@@ -2058,8 +2046,6 @@ function handleDeleteFolder(container) {
 }
 
 function deleteFolderById(folderId, folderPath, folderName) {
-    console.log('deleteFolderById called with:', { folderId, folderPath, folderName });
-    console.log('cachedFolderIds keys:', Object.keys(cachedFolderIds));
     if (!folderId) {
         console.error('No folder ID provided');
         return;
@@ -2207,5 +2193,78 @@ function forceRefreshBookmarks() {
         filteredBookmarkItems = cachedBookmarkItems.slice();
         displayBookmarks(searchQuery);
         saveCollapsedState();
+    });
+}
+
+function isSystemUrl(url) {
+    if (!url) return true;
+    var blocked = ['chrome://', 'edge://', 'about:', 'chrome-extension://', 'edge-extension://', 'file://'];
+    for (var i = 0; i < blocked.length; i++) {
+        if (url.indexOf(blocked[i]) === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function handleDeduplicate(container) {
+    if (!container) return;
+    var folderPath = container.dataset.folder;
+    var folderId = cachedFolderIds[folderPath];
+    if (!folderId) {
+        console.error('handleDeduplicate: folderId not found');
+        return;
+    }
+    
+    var allBookmarks = [];
+    
+    function collectBookmarks(node) {
+        if (node.url) {
+            allBookmarks.push({ id: node.id, url: node.url });
+        }
+        if (node.children) {
+            node.children.forEach(collectBookmarks);
+        }
+    }
+    
+    chrome.bookmarks.getSubTree(folderId, function(result) {
+        if (chrome.runtime.lastError || !result || !result[0]) {
+            console.error('handleDeduplicate: failed to get folder');
+            return;
+        }
+        collectBookmarks(result[0]);
+        
+        var urlMap = {};
+        var duplicates = [];
+        
+        allBookmarks.forEach(function(bm) {
+            if (!bm.url) return;
+            if (urlMap[bm.url]) {
+                duplicates.push(bm.id);
+            } else {
+                urlMap[bm.url] = bm.id;
+            }
+        });
+        
+        if (duplicates.length === 0) {
+            showToast(getMessage('noDuplicatesFound'));
+            return;
+        }
+        
+        var deletedCount = 0;
+        var total = duplicates.length;
+        
+        duplicates.forEach(function(id, index) {
+            chrome.bookmarks.remove(id, function() {
+                if (!chrome.runtime.lastError) {
+                    deletedCount++;
+                }
+                if (index === total - 1) {
+                    var msg = getMessage('deduplicateComplete').replace('{count}', deletedCount);
+                    showToast(msg);
+                    forceRefreshBookmarks();
+                }
+            });
+        });
     });
 }

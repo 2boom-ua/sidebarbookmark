@@ -76,5 +76,17 @@
     },
     "contextDeleteFolder": {
         "message": "Видалити папку"
+    },
+    "systemUrlError": {
+        "message": "Не можна додати системну сторінку"
+    },
+    "deduplicateMenuItem": {
+        "message": "Дублікати"
+    },
+    "deduplicateComplete": {
+        "message": "Видалено {count} дублікатів"
+    },
+    "noDuplicatesFound": {
+        "message": "Дублікатів не знайдено"
     }
 }

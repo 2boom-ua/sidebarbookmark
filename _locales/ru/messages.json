@@ -76,5 +76,17 @@
     },
     "contextDeleteFolder": {
         "message": "Удалить папку"
+    },
+    "systemUrlError": {
+        "message": "Не возможно добавить системную страницу"
+    },
+    "deduplicateMenuItem": {
+        "message": "Дубликаты"
+    },
+    "deduplicateComplete": {
+        "message": "Удалено {count} дубликатов"
+    },
+    "noDuplicatesFound": {
+        "message": "Дубликатов не найдено"
     }
 }
