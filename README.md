@@ -2,7 +2,7 @@
 
 Sidebar bookmarks manager with folders, search, sorting, and quick actions.
 
-[![License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
+[![License](https://img.shields.io/badge/license-GPLv2-red.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 ![Version](https://img.shields.io/badge/version-1.3-green.svg)
 
 ## Permissions
