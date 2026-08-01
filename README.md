@@ -4,6 +4,7 @@
     <img src="https://github.com/2boom-ua/sidebarbookmark/blob/main/screenshot.jpg?raw=true" alt="" width="493" height="300">
 </div>
 
+
 Sidebar bookmarks manager with folders, search, sorting, and quick actions.
 
 [![License](https://img.shields.io/badge/license-GPLv2-red.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
