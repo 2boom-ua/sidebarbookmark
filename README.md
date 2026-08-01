@@ -1,8 +1,8 @@
+# Bookmark in Sidebar
+
 <div align="center">  
     <img src="https://github.com/2boom-ua/sidebarbookmark/blob/main/screenshot.jpg?raw=true" alt="" width="493" height="300">
 </div>
-
-# Bookmark in Sidebar
 
 Sidebar bookmarks manager with folders, search, sorting, and quick actions.
 
