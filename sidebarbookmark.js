@@ -1776,15 +1776,25 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
         menu.appendChild(div);
     });
     
+
+    menu.classList.add('active');
+    
+    // Force layout to get correct dimensions
+    menu.offsetHeight;
+    
     // Position menu
-    var menuWidth = 180;
-    var menuHeight = items.length * 38 + 12;
+    var menuWidth = menu.offsetWidth || 160;
+    var menuHeight = menu.offsetHeight || (items.length * 38 + 12);
     var maxX = window.innerWidth - menuWidth - 10;
     var maxY = window.innerHeight - menuHeight - 10;
     
-    menu.style.left = Math.min(x, maxX) + 'px';
-    menu.style.top = Math.min(y, maxY) + 'px';
-    menu.classList.add('active');
+    var leftPos = Math.min(x, maxX);
+    if (leftPos < 10) leftPos = 10;
+    var topPos = Math.min(y, maxY);
+    if (topPos < 10) topPos = 10;
+    
+    menu.style.left = leftPos + 'px';
+    menu.style.top = topPos + 'px';
     
     // Close on click outside
     setTimeout(function() {
