@@ -1,5 +1,5 @@
 <div align="center">  
-    <img src="https://github.com/2boom-ua/sidebarbookmark/blob/main/screenshot.jpg?raw=true" alt="" width="493" height="300">
+    <img src="https://github.com/2boom-ua/sidebarbookmark/blob/main/icons/icon_128.png?raw=true" alt="" width="128" height="128">
 </div>
 
 # Bookmark in Sidebar
