@@ -88,5 +88,8 @@
     },
     "noDuplicatesFound": {
         "message": "No duplicates found"
+    },
+    "trashFolder": {
+        "message": "Trash"
     }
 }

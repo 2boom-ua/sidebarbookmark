@@ -88,5 +88,8 @@
     },
     "noDuplicatesFound": {
         "message": "Дубликатов не найдено"
+    },
+    "trashFolder": {
+        "message": "Корзина"
     }
 }

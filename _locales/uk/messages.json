@@ -88,5 +88,8 @@
     },
     "noDuplicatesFound": {
         "message": "Дублікатів не знайдено"
+    },
+    "trashFolder": {
+        "message": "Кошик"
     }
 }

@@ -44,7 +44,8 @@ function getMessage(key) {
             'systemUrlError': 'Cannot add system page',
             'deduplicateMenuItem': 'Deduplicate',
             'deduplicateComplete': 'Deleted {count} duplicates',
-            'noDuplicatesFound': 'No duplicates found'
+            'noDuplicatesFound': 'No duplicates found',
+            'trashFolder': 'Trash'
         };
         return fallback[key] || key;
     }
@@ -646,7 +647,7 @@ function renderBookmarks(items, listElement) {
     var filteredGroups = {};
     Object.keys(groups).forEach(function(key) {
         var folderId = cachedFolderIds[key];
-        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
+        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743' || folderId === '4';
         if (groups[key].length > 0 || !isSystemFolder) {
             filteredGroups[key] = groups[key];
         }
@@ -656,7 +657,7 @@ function renderBookmarks(items, listElement) {
     var visibleGroups = {};
     Object.keys(groups).forEach(function(key) {
         var folderId = cachedFolderIds[key];
-        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
+        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743' || folderId === '4';
         
         if (isSystemFolder) {
             visibleGroups[key] = groups[key];
@@ -759,6 +760,9 @@ function renderBookmarks(items, listElement) {
         } else if (groupKey === 'Mobile bookmarks' || groupKey === 'Mobile favorites' || folderId === '3' || folderId === '45' || folderId === '743' || groupKey.startsWith('Mobile bookmarks/') || groupKey.startsWith('Mobile favorites/')) {
             folderImg.src = 'icons/mobile.svg';
             folderImg.alt = 'Mobile bookmarks';
+        } else if (folderId === '4') {
+            folderImg.src = 'icons/delete.svg';
+            folderImg.alt = 'Trash';
         } else {
             folderImg.src = 'icons/folder.svg';
             folderImg.alt = 'Folder';
