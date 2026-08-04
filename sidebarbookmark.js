@@ -600,7 +600,9 @@ function getSortIconPath(mode) {
 // Sort bookmarks by mode
 function sortBookmarks(bookmarks, mode) {
     if (mode === 'chrome') {
-        return bookmarks;
+        return bookmarks.slice().sort(function(a, b) {
+            return b.dateAdded - a.dateAdded;
+        });
     }
     
     var sorted = bookmarks.slice();
