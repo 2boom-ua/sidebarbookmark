@@ -34,7 +34,9 @@ The extension does not collect, store, or transmit any user data. All data stays
 
 ## Installation
 
-### From Chrome Web Store (coming soon)
+### From Chrome Web Store or Edge Add-ons
+[![Available in the Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-blue?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/bookmarks/cpldogciolagoglcmfaohmnnkcmjmdbi)
+[![Available in Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge%20Add--ons-Install-0078D7?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/bookmarks/jggknpiedkcmmjapnhfmhoichjeldldl)
 
 ### Manual Installation (Developer Mode)
 
