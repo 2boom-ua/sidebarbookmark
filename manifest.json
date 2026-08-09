@@ -4,6 +4,7 @@
   "version": "1.4",
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
+  "author": "(c) 2boom 2026",
   "permissions": [
     "sidePanel",
     "bookmarks",
