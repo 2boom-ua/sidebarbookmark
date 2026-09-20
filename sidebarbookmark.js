@@ -549,7 +549,7 @@ function createBookmarkItem(item) {
         if (!e.target.closest('.action-btn') && !e.target.closest('a')) {
             var url = this.dataset.bookmarkUrl;
             if (url) {
-                window.open(url, '_blank');
+                chrome.tabs.create({ url: url });
             }
         }
     });
