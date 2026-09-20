@@ -490,6 +490,9 @@ function createBookmarkItem(item) {
             clearTimeout(tooltipTimer);
             tooltipTimer = null;
         }
+        if (urlTooltip.classList.contains('show')) {
+            return;
+        }
         positionTooltip(li, urlTooltip);
         urlTooltip.classList.add('show');
     }
@@ -499,18 +502,27 @@ function createBookmarkItem(item) {
             clearTimeout(tooltipTimer);
             tooltipTimer = null;
         }
+        if (li.matches(':hover')) {
+            return;
+        }
         urlTooltip.classList.remove('show');
     }
 
     li.addEventListener('mouseenter', function(e) {
         e.stopPropagation();
+        if (tooltipTimer) {
+            clearTimeout(tooltipTimer);
+        }
         tooltipTimer = setTimeout(function() {
             showUrlTooltip();
         }, 400);
     });
-
+    
     li.addEventListener('mouseleave', function(e) {
         e.stopPropagation();
+        if (li.matches(':hover')) {
+            return;
+        }
         hideUrlTooltip();
     });
 
