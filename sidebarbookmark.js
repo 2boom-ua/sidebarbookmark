@@ -213,6 +213,51 @@ function positionTooltip(element, tooltip) {
     }
 }
 
+function browserFaviconUrl(pageUrl, size) {
+    var u = new URL(chrome.runtime.getURL('/_favicon/'));
+    u.searchParams.set('pageUrl', pageUrl);
+    u.searchParams.set('size', size);
+    return u.toString();
+}
+
+function loadFavicon(img, url) {
+    var domain;
+    try {
+        domain = new URL(url).hostname;
+    } catch (e) {
+        img.src = 'icons/favicon-default.svg';
+        return;
+    }
+
+    var sources = [
+        browserFaviconUrl(url, 32),
+        'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32',
+        'https://icon.horse/icon/' + domain,
+        'https://' + domain + '/favicon.ico'
+    ];
+    var i = 0;
+
+    function next() {
+        if (i >= sources.length) {
+            img.onerror = null;
+            img.onload = null;
+            img.src = 'icons/favicon-default.svg';
+            return;
+        }
+        img.src = sources[i++];
+    }
+
+    img.onerror = next;
+    img.onload = function () {
+        // 1x1 або дефолтний 16x16 «глобус» від Google при запиті 32 → пробуємо наступне джерело
+        if (img.naturalWidth < 32 && i > 1 && i < sources.length) {
+            next();
+        }
+    };
+
+    next();
+}
+
 function createBookmarkItem(item) {
     var li = document.createElement('li');
     li.dataset.bookmarkUrl = item.url;
@@ -223,18 +268,7 @@ function createBookmarkItem(item) {
     // Favicon
     var faviconImg = document.createElement('img');
     faviconImg.className = 'favicon';
-    try {
-        var domain = new URL(item.url).hostname;
-        faviconImg.src = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=16';
-        faviconImg.onerror = function() {
-            this.src = 'https://icon.horse/icon/' + domain;
-            this.onerror = function() {
-                this.src = 'icons/favicon-default.svg';
-            };
-        };
-    } catch (e) {
-        faviconImg.src = 'icons/favicon-default.svg';
-    }
+    loadFavicon(faviconImg, item.url);
 
     var linkContainer = document.createElement('span');
     linkContainer.className = 'link-container';
