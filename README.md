@@ -6,7 +6,7 @@
 
 Sidebar bookmarks manager with folders, search, sorting, and quick actions.
 
-![Version](https://img.shields.io/badge/version-1.7-green.svg)
+![Version](https://img.shields.io/badge/version-1.8-green.svg)
 
 ## Permissions
 
