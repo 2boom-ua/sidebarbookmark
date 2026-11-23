@@ -9,6 +9,7 @@ var editingBookmarkId = null;
 var folderSortModes = {};
 var refreshDebounceTimer = null;
 var cachedFolderIds = {};
+var cachedFolderChildren = {};
 
 var cachedBookmarksHash = null;
 var lastQuery = '';
@@ -45,7 +46,13 @@ function getMessage(key) {
             'deduplicateMenuItem': 'Deduplicate',
             'deduplicateComplete': 'Deleted {count} duplicates',
             'noDuplicatesFound': 'No duplicates found',
-            'trashFolder': 'Trash'
+            'trashFolder': 'Trash',
+            'sortBrowserOrder': 'Order: as in browser',
+            'sortNewest': 'Order: newest first',
+            'sortOldest': 'Order: oldest first',
+            'sortAz': 'Order: A to Z',
+            'sortZa': 'Order: Z to A',
+            'menuTooltip': 'Menu'
         };
         return fallback[key] || key;
     }
@@ -77,6 +84,7 @@ function loadBookmarksToCache() {
             // Extract all bookmarks from tree
             var allBookmarks = [];
             var folderIds = {};
+            var folderChildren = {};            
             function traverse(nodes, path) {
                 nodes.forEach(function(node) {
                     
@@ -107,6 +115,7 @@ function loadBookmarksToCache() {
                     if (node.url) {
                         node.folderPath = path;
                         allBookmarks.push(node);
+                        (folderChildren[path] || (folderChildren[path] = [])).push({ bookmark: node });
                     }
                     
                     if (node.children) {
@@ -127,6 +136,14 @@ function loadBookmarksToCache() {
                             var rootName = rootNames[node.id];
                             newPath = path ? path + '/' + rootName : rootName;
                         }
+                        if (!folderChildren[newPath]) folderChildren[newPath] = [];
+                        if (newPath !== path) {
+                            var siblings = folderChildren[path] || (folderChildren[path] = []);
+                            var already = siblings.some(function(e) { return e.folder === newPath; });
+                            if (!already) {
+                                siblings.push({ folder: newPath, dateAdded: node.dateAdded });
+                            }
+                        }
                         traverse(node.children, newPath);
                     }
                 });
@@ -135,7 +152,7 @@ function loadBookmarksToCache() {
 
             cachedBookmarkItems = allBookmarks;
             cachedFolderIds = folderIds;
-            cachedFolderIds = folderIds;
+            cachedFolderChildren = folderChildren;
             resolve(allBookmarks);
         });
     });
@@ -220,6 +237,39 @@ function browserFaviconUrl(pageUrl, size) {
     return u.toString();
 }
 
+var defaultFaviconPromise = null;
+
+function getImageSignature(img) {
+    try {
+        var c = document.createElement('canvas');
+        c.width = 16;
+        c.height = 16;
+        var ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 16, 16);
+        var d = ctx.getImageData(0, 0, 16, 16).data;
+        var h = 0;
+        for (var i = 0; i < d.length; i++) {
+            h = (h * 31 + d[i]) | 0;
+        }
+        return h;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Signature of the generic icon the browser returns when it has no favicon
+function getDefaultFaviconSignature() {
+    if (!defaultFaviconPromise) {
+        defaultFaviconPromise = new Promise(function(resolve) {
+            var ref = new Image();
+            ref.onload = function() { resolve(getImageSignature(ref)); };
+            ref.onerror = function() { resolve(null); };
+            ref.src = browserFaviconUrl('https://favicon-reference.invalid/', 32);
+        });
+    }
+    return defaultFaviconPromise;
+}
+
 function loadFavicon(img, url) {
     var domain;
     try {
@@ -229,39 +279,45 @@ function loadFavicon(img, url) {
         return;
     }
 
-    var sources = [
-        browserFaviconUrl(url, 32),
-        'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32',
-        'https://icon.horse/icon/' + domain,
-        'https://' + domain + '/favicon.ico'
-    ];
-    var i = 0;
+    img.src = 'icons/favicon-default.svg';   // placeholder until a real icon is found
 
-    function next() {
-        if (i >= sources.length) {
-            img.onerror = null;
-            img.onload = null;
-            img.src = 'icons/favicon-default.svg';
-            return;
-        }
-        img.src = sources[i++];
+    function probe(src, isValid, onOk, onFail) {
+        var p = new Image();
+        p.onload = function() { isValid(p) ? onOk(src) : onFail(); };
+        p.onerror = onFail;
+        p.src = src;
     }
 
-    img.onerror = next;
-    img.onload = function () {
-        // 1x1 або дефолтний 16x16 «глобус» від Google при запиті 32 → пробуємо наступне джерело
-        if (img.naturalWidth < 32 && i > 1 && i < sources.length) {
-            next();
-        }
-    };
+    function useIcon(src) {
+        img.src = src;
+    }
 
-    next();
+    function tryIconHorse() {
+        probe('https://icon.horse/icon/' + domain, function() { return true; }, useIcon, function() {});
+    }
+
+    function tryGoogle() {
+        probe('https://www.google.com/s2/favicons?domain=' + domain + '&sz=32',
+            function(p) { return p.naturalWidth >= 32; },
+            useIcon, tryIconHorse);
+    }
+
+    getDefaultFaviconSignature().then(function(defaultSig) {
+        probe(browserFaviconUrl(url, 32),
+            function(p) {
+                if (defaultSig === null) return true;
+                var sig = getImageSignature(p);
+                return sig === null || sig !== defaultSig;
+            },
+            useIcon, tryGoogle);
+    });
 }
 
 function createBookmarkItem(item) {
     var li = document.createElement('li');
     li.dataset.bookmarkUrl = item.url;
     li.dataset.bookmarkId = item.id;
+    li.draggable = true;
 
     var title = item.title || item.url;
 
@@ -624,7 +680,7 @@ function saveSortModes() {
 
 // Get next sort mode
 function getNextSortMode(currentMode) {
-    var modes = ['chrome', 'oldest', 'az', 'za'];
+    var modes = ['chrome', 'newest', 'oldest', 'az', 'za'];
     var currentIndex = modes.indexOf(currentMode);
     if (currentIndex === -1 || currentIndex === modes.length - 1) {
         return modes[0];
@@ -632,15 +688,43 @@ function getNextSortMode(currentMode) {
     return modes[currentIndex + 1];
 }
 
+function getSortTitle(mode) {
+    var keys = {
+        'chrome': 'sortBrowserOrder',
+        'newest': 'sortNewest',
+        'oldest': 'sortOldest',
+        'az': 'sortAz',
+        'za': 'sortZa'
+    };
+    return keys[mode] ? getMessage(keys[mode]) : '';
+}
+
 // Get sort icon path
 function getSortIconPath(mode) {
     var icons = {
         'chrome': 'icons/sort-default.svg',
+        'newest': 'icons/sort-newest.svg',        
         'oldest': 'icons/sort-oldest.svg',
         'az': 'icons/sort-az.svg',
         'za': 'icons/sort-za.svg'
     };
     return icons[mode] || icons['chrome'];
+}
+
+function attachTooltip(btn, text) {
+    var tip = document.createElement('span');
+    tip.className = 'tooltip';
+    tip.textContent = text;
+    btn.appendChild(tip);
+    btn.addEventListener('mouseenter', function(e) {
+        e.stopPropagation();
+        tip.classList.add('show');
+    });
+    btn.addEventListener('mouseleave', function(e) {
+        e.stopPropagation();
+        tip.classList.remove('show');
+    });
+    return tip;
 }
 
 // Sort bookmarks by mode
@@ -674,80 +758,78 @@ function sortBookmarks(bookmarks, mode) {
     return sorted;
 }
 
-function renderBookmarks(items, listElement) {
+function renderBookmarks(items, listElement, isFiltered) {
     listElement.innerHTML = '';
-    
-    var groups = {};
-    items.forEach(function(item) {
-        var folderPath = item.folderPath || 'Без папки';
-        if (!groups[folderPath]) {
-            groups[folderPath] = [];
-        }
-        groups[folderPath].push(item);
-    });
-    
-    Object.keys(cachedFolderIds).forEach(function(folderPath) {
-        if (!groups[folderPath]) {
-            groups[folderPath] = [];
-        }
-    });
 
-    var filteredGroups = {};
-    Object.keys(groups).forEach(function(key) {
-        var folderId = cachedFolderIds[key];
-        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743' || folderId === '4';
-        if (groups[key].length > 0 || !isSystemFolder) {
-            filteredGroups[key] = groups[key];
-        }
-    });
-    groups = filteredGroups;
+    if (isFiltered === undefined) {
+        isFiltered = items.length < cachedBookmarkItems.length;
+    }
 
-    var visibleGroups = {};
-    Object.keys(groups).forEach(function(key) {
-        var folderId = cachedFolderIds[key];
-        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743' || folderId === '4';
-        
-        if (isSystemFolder) {
-            visibleGroups[key] = groups[key];
-            return;
-        }
-        
-        var pathParts = key.split('/');
-        if (pathParts.length > 1) {
-            var parentPath = pathParts.slice(0, -1).join('/');
-            var isParentExpanded = true;
-            var currentPath = parentPath;
-            while (currentPath) {
-                if (collapsedFolders[currentPath] === true) {
-                    isParentExpanded = false;
-                    break;
-                }
-                var parts = currentPath.split('/');
-                if (parts.length <= 1) {
-                    break;
-                }
-                currentPath = parts.slice(0, -1).join('/');
-            }
-            
-            if (isParentExpanded) {
-                visibleGroups[key] = groups[key];
-            }
-        } else {
-            visibleGroups[key] = groups[key];
-        }
-    });
-    groups = visibleGroups;
+    var allowedIds = {};
+    items.forEach(function(item) { allowedIds[item.id] = true; });
 
-    var sortedGroupKeys = Object.keys(groups).sort();
+    function isSystemFolderId(id) {
+        return id === '1' || id === '2' || id === '3' || id === '45' || id === '743' || id === '4';
+    }
 
-    sortedGroupKeys.forEach(function(groupKey) {
+    var matchCache = {};
+    function subtreeHasItems(path) {
+        if (matchCache[path] !== undefined) return matchCache[path];
+        matchCache[path] = false;
+        var result = (cachedFolderChildren[path] || []).some(function(entry) {
+            return entry.bookmark ? !!allowedIds[entry.bookmark.id] : subtreeHasItems(entry.folder);
+        });
+        matchCache[path] = result;
+        return result;
+    }
+
+    function isFolderVisible(path) {
+        if (isFiltered) return subtreeHasItems(path);
+        if (isSystemFolderId(cachedFolderIds[path])) {
+            return (cachedFolderChildren[path] || []).length > 0;
+        }
+        return true;
+    }
+
+    function getOrderedChildren(path) {
+        var children = (cachedFolderChildren[path] || []).slice();
+        var mode = folderSortModes[path] || 'chrome';
+        if (mode === 'chrome') {
+            // folders first, each group keeps the browser order
+            var chromeFolders = children.filter(function(e) { return e.folder; });
+            var chromeMarks = children.filter(function(e) { return e.bookmark; });
+            return chromeFolders.concat(chromeMarks);
+        }
+
+        function nameOf(e) {
+            var n = e.bookmark ? e.bookmark.title : e.folder.substring(e.folder.lastIndexOf('/') + 1);
+            return (n || '').toLowerCase();
+        }
+        function dateOf(e) { return e.bookmark ? e.bookmark.dateAdded : e.dateAdded; }
+        function cmp(a, b) {
+            if (mode === 'newest') return dateOf(b) - dateOf(a);
+            if (mode === 'oldest') return dateOf(a) - dateOf(b);
+            var r = nameOf(a).localeCompare(nameOf(b));
+            return mode === 'za' ? -r : r;
+        }
+        var folders = children.filter(function(e) { return e.folder; }).sort(cmp);
+        var marks = children.filter(function(e) { return e.bookmark; }).sort(cmp);
+        return folders.concat(marks);   // у інших режимах підпапки зверху
+    }
+
+    function buildGroup(groupKey, parentEl) {
+
         var groupContainer = document.createElement('div');
         groupContainer.className = 'group-container';
         groupContainer.dataset.folder = groupKey;
+        var depth = groupKey.split('/').length - 1;
+        groupContainer.dataset.depth = depth;
+        groupContainer.style.marginLeft = (depth > 0 && depth <= 5) ? '12px' : '0';        
         
         var header = document.createElement('div');
         header.className = 'group-header';
         header.style.cursor = 'pointer';
+        if (!isSystemFolderId(cachedFolderIds[groupKey])) { header.draggable = true; }
         
         var folderId = cachedFolderIds[groupKey];
         
@@ -798,8 +880,11 @@ function renderBookmarks(items, listElement) {
         toggleSymbol.className = 'toggle-symbol';
         var isCollapsed = collapsedFolders[groupKey] === true;
         toggleSymbol.classList.add(isCollapsed ? 'closed' : 'open');
+        if ((cachedFolderChildren[groupKey] || []).length === 0) {
+            toggleSymbol.style.visibility = 'hidden';
+        }
         
-        if (groupKey === 'Favorites bar' || groupKey === 'Bookmarks bar' || folderId === '1' || groupKey.startsWith('Favorites bar/') || groupKey.startsWith('Bookmarks bar/')) {
+        if (groupKey === 'Favorites bar' || groupKey === 'Bookmarks bar' || folderId === '1') {
             folderImg.src = 'icons/star.svg';
             folderImg.alt = 'Favorites';
         } else if (groupKey === 'Other bookmarks' || groupKey === 'Other favorites' || folderId === '2' || groupKey.startsWith('Other bookmarks/') || groupKey.startsWith('Other favorites/')) {
@@ -812,20 +897,17 @@ function renderBookmarks(items, listElement) {
             folderImg.src = 'icons/delete.svg';
             folderImg.alt = 'Trash';
         } else {
-            folderImg.src = 'icons/folder.svg';
+            folderImg.src = isCollapsed ? 'icons/folder.svg' : 'icons/folder-open.svg';
             folderImg.alt = 'Folder';
         }
         folderImg.className = 'folder-icon';
-        folderImg.style.cssText = 'width: 17px; height: 17px; display: inline-block; vertical-align: middle; margin-right: 6px; filter: var(--icon-filter);';
+        //folderImg.style.cssText = 'width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px; filter: var(--icon-filter);';
+        var folderIconSize = depth === 0 ? 18 : 16;   // root folders bigger, nested keep the old size
+        folderImg.style.cssText = 'width: ' + folderIconSize + 'px; height: ' + folderIconSize + 'px; display: inline-block; vertical-align: middle; margin-right: 6px; filter: var(--icon-filter);';
 
         var folderNameSpan = document.createElement('span');
         folderNameSpan.className = 'folder-name';
-        var displayName = groupKey.replace(/\//g, ' ▸ ');
-        var parts = displayName.split(' ▸ ');
-        if (parts.length > 3) {
-            displayName = parts[0] + ' ▸ ... ▸ ' + parts[parts.length - 1];
-        }
-        folderNameSpan.textContent = displayName;
+        folderNameSpan.textContent = groupKey.substring(groupKey.lastIndexOf('/') + 1);
 
         var folderNewBtn = document.createElement('button');
         folderNewBtn.className = 'folder-new-btn';
@@ -835,6 +917,7 @@ function renderBookmarks(items, listElement) {
         folderNewIcon.alt = 'New Folder';
         folderNewIcon.style.cssText = 'width:15px;height:15px;display:block;';
         folderNewBtn.appendChild(folderNewIcon);
+        attachTooltip(folderNewBtn, getMessage('contextCreateFolder'));
         
         folderNewBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1028,7 +1111,7 @@ function renderBookmarks(items, listElement) {
             });
         });
 
-        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '45' || folderId === '743';
+        var isSystemFolder = folderId === '1' || folderId === '2' || folderId === '3' || folderId === '4' || folderId === '45' || folderId === '743';
         var deleteBtn = null;
         
         if (!isSystemFolder) {
@@ -1040,6 +1123,7 @@ function renderBookmarks(items, listElement) {
             deleteIcon.alt = 'Delete Folder';
             deleteIcon.style.cssText = 'width:15px;height:15px;display:block;';
             deleteBtn.appendChild(deleteIcon);
+            attachTooltip(deleteBtn, getMessage('contextDeleteFolder'));
             
             deleteBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -1067,6 +1151,7 @@ function renderBookmarks(items, listElement) {
         addIcon.alt = 'Add';
         addIcon.style.cssText = 'width:15px;height:15px;display:block;';
         addBtn.appendChild(addIcon);
+        attachTooltip(addBtn, getMessage('contextAddBookmark'));        
         
         addBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1089,6 +1174,7 @@ function renderBookmarks(items, listElement) {
         sortIcon.alt = 'Sort';
         sortIcon.style.cssText = 'width:16px;height:16px;display:block;';
         sortBtn.appendChild(sortIcon);
+        attachTooltip(sortBtn, getSortTitle(currentMode));        
         
         sortBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1107,6 +1193,8 @@ function renderBookmarks(items, listElement) {
             }
             
             icon.src = getSortIconPath(nextMode);
+            var sortTip = this.querySelector('.tooltip');
+            if (sortTip) sortTip.textContent = getSortTitle(nextMode);
             
             saveSortModes();
             
@@ -1122,6 +1210,7 @@ function renderBookmarks(items, listElement) {
         menuIcon.alt = 'Menu';
         menuIcon.style.cssText = 'width:16px;height:16px;display:block;';
         menuBtn.appendChild(menuIcon);
+        attachTooltip(menuBtn, getMessage('menuTooltip'));      
 
         menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1171,12 +1260,15 @@ function renderBookmarks(items, listElement) {
         var itemsContainer = document.createElement('div');
         itemsContainer.className = 'group-items';
         
-        var sortMode = folderSortModes[groupKey] || 'chrome';
-        var sortedItems = sortBookmarks(groups[groupKey], sortMode);
-        
-        sortedItems.forEach(function(item) {
-            var li = createBookmarkItem(item);
-            itemsContainer.appendChild(li);
+        var isCollapsedNow = collapsedFolders[groupKey] === true;
+        getOrderedChildren(groupKey).forEach(function(entry) {
+            if (entry.bookmark) {
+                if (allowedIds[entry.bookmark.id]) {
+                    itemsContainer.appendChild(createBookmarkItem(entry.bookmark));
+                }
+            } else if (!isCollapsedNow && isFolderVisible(entry.folder)) {
+                buildGroup(entry.folder, itemsContainer);
+            }
         });
         
         if (collapsedFolders[groupKey] === true) {
@@ -1188,7 +1280,7 @@ function renderBookmarks(items, listElement) {
         }
         
         groupContainer.appendChild(itemsContainer);
-        listElement.appendChild(groupContainer);
+        parentEl.appendChild(groupContainer);
 
         header.addEventListener('click', function(e) {
             if (editingBookmarkId !== null && editingBookmarkId.toString().startsWith('folder-')) {
@@ -1265,7 +1357,7 @@ function renderBookmarks(items, listElement) {
             displayBookmarks(searchQuery);
         });
         
-        itemsContainer.querySelectorAll('a').forEach(function(link) {
+        itemsContainer.querySelectorAll(':scope > li a').forEach(function(link) {
             link.addEventListener('click', function(e) {
                 document.querySelectorAll('.group-header.active-folder').forEach(function(el) {
                     el.classList.remove('active-folder');
@@ -1273,6 +1365,12 @@ function renderBookmarks(items, listElement) {
                 header.classList.add('active-folder');
             });
         });
+    }
+
+    getOrderedChildren('').forEach(function(entry) {
+        if (entry.folder && isFolderVisible(entry.folder)) {
+            buildGroup(entry.folder, listElement);
+        }
     });
 }
 
@@ -1417,6 +1515,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    initDragAndDrop();
     loadBookmarks('');
 
 });
@@ -1746,6 +1845,21 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
     
     // Close any existing menu
     closeContextMenu();
+
+    // Transparent overlay: blocks the list while the menu is open
+    var overlay = document.createElement('div');
+    overlay.id = 'contextOverlay';
+    overlay.className = 'context-overlay';
+    overlay.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeContextMenu();
+    });
+    overlay.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+    });
+    document.body.appendChild(overlay);
     
     // Build menu items
     var items = [
@@ -1760,19 +1874,19 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
             label: getMessage('contextAddBookmark')
         },
         {
-            id: 'rename-folder',
-            icon: 'icons/rename.svg',
-            label: getMessage('contextRenameFolder')
-        },
-        {
             id: 'deduplicate',
             icon: 'icons/dedup.svg',
             label: getMessage('deduplicateMenuItem')
         },
     ];
     
-    // Add delete option only for non-system folders
+    // Rename and delete are available only for non-system folders
     if (!isSystemFolder) {
+        items.splice(2, 0, {
+            id: 'rename-folder',
+            icon: 'icons/rename.svg',
+            label: getMessage('contextRenameFolder')
+        });
         items.push({
             id: 'delete-folder',
             icon: 'icons/delete.svg',
@@ -1848,46 +1962,29 @@ function showContextMenu(x, y, folderPath, folderId, isSystemFolder, folderName,
     menu.style.left = leftPos + 'px';
     menu.style.top = topPos + 'px';
     
-    // Close on click outside
-    setTimeout(function() {
-        document.addEventListener('click', closeContextMenu);
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeContextMenu();
-            }
-        });
-    }, 0);
-    
-    // Auto close after 5 seconds
-    window.contextMenuTimer = null;
-    
-    function resetContextMenuTimeout() {
-        if (window.contextMenuTimer) {
-            clearTimeout(window.contextMenuTimer);
-        }
-        window.contextMenuTimer = setTimeout(function() {
-            closeContextMenu();
-        }, 5000);
+    // Close on Escape, window blur, resize
+    document.addEventListener('keydown', onContextMenuKeydown);
+    window.addEventListener('blur', closeContextMenu);
+    window.addEventListener('resize', closeContextMenu);
+}
+
+function onContextMenuKeydown(e) {
+    if (e.key === 'Escape') {
+        closeContextMenu();
     }
-    
-    // Reset timer on any mouse movement inside menu
-    menu.addEventListener('mousemove', function() {
-        resetContextMenuTimeout();
-    });
-    
-    // Initial timer
-    resetContextMenuTimeout();
-    }
-    
-    function closeContextMenu() {
-        var menu = document.getElementById('contextMenu');
-        menu.classList.remove('active');
-        menu.innerHTML = '';
-        document.removeEventListener('click', closeContextMenu);
-        if (window.contextMenuTimer) {
-            clearTimeout(window.contextMenuTimer);
-            window.contextMenuTimer = null;
-        }
+}
+
+function closeContextMenu() {
+    var menu = document.getElementById('contextMenu');
+    menu.classList.remove('active');
+    menu.innerHTML = '';
+
+    var overlay = document.getElementById('contextOverlay');
+    if (overlay) overlay.remove();
+
+    document.removeEventListener('keydown', onContextMenuKeydown);
+    window.removeEventListener('blur', closeContextMenu);
+    window.removeEventListener('resize', closeContextMenu);
 }
 
 function handleCreateFolder(container) {
@@ -2328,5 +2425,164 @@ function handleDeduplicate(container) {
                 }
             });
         });
+    });
+}
+
+var SYSTEM_FOLDER_IDS = ['1', '2', '3', '4', '45', '743'];
+var dragState = null;
+
+function initDragAndDrop() {
+    var list = document.getElementById('history-list');
+
+    function clearDropMarks() {
+        list.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach(function(el) {
+            el.classList.remove('drop-before', 'drop-after', 'drop-into');
+        });
+    }
+
+    function isInsideDragged(folderPath) {
+        return dragState && dragState.type === 'folder' &&
+            (folderPath === dragState.path || folderPath.indexOf(dragState.path + '/') === 0);
+    }
+
+    function getDropTarget(e) {
+        var el = e.target.closest ? e.target.closest('li[data-bookmark-id], .group-header') : null;
+        if (!el || !list.contains(el)) return null;
+
+        var container = el.closest('.group-container');
+        var folderPath = container.dataset.folder;
+        var rect = el.getBoundingClientRect();
+        var relY = (e.clientY - rect.top) / rect.height;
+
+        if (isInsideDragged(folderPath)) return null;
+
+        if (el.classList.contains('group-header')) {
+            var folderId = cachedFolderIds[folderPath];
+            var parentPath = folderPath.indexOf('/') === -1 ? '' : folderPath.substring(0, folderPath.lastIndexOf('/'));
+            var canPlace = SYSTEM_FOLDER_IDS.indexOf(folderId) === -1 &&
+                (folderSortModes[parentPath] || 'chrome') === 'chrome';
+            if (canPlace && relY < 0.25) {
+                return { el: el, position: 'before', id: folderId, folderPath: folderPath };
+            }
+            return { el: el, position: 'into', folderPath: folderPath };
+        }
+
+        var bookmarkId = el.dataset.bookmarkId;
+        if (dragState.type === 'bookmark' && bookmarkId === dragState.id) return null;
+
+        if ((folderSortModes[folderPath] || 'chrome') !== 'chrome') {
+            // reordering inside a sorted folder makes no sense: block it
+            if (dragState.sourceFolder === folderPath) return null;
+            return { el: container.querySelector('.group-header'), position: 'into', folderPath: folderPath };
+        }
+        return { el: el, position: relY < 0.5 ? 'before' : 'after', id: bookmarkId, folderPath: folderPath };
+    }
+
+    function moveTo(source, target) {
+        function done() {
+            if (chrome.runtime.lastError) {
+                console.error('Move failed:', chrome.runtime.lastError.message);
+            }
+        }
+        if (target.position === 'into') {
+            var parentId = cachedFolderIds[target.folderPath];
+            if (!parentId) return;
+            chrome.bookmarks.move(source.id, { parentId: parentId }, done);
+            return;
+        }
+        chrome.bookmarks.get(target.id, function(res) {
+            if (chrome.runtime.lastError || !res || !res[0]) return;
+            var ref = res[0];
+            chrome.bookmarks.move(source.id, {
+                parentId: ref.parentId,
+                index: target.position === 'before' ? ref.index : ref.index + 1
+            }, done);
+        });
+    }
+
+    list.addEventListener('dragstart', function(e) {
+        if (editingBookmarkId !== null) { e.preventDefault(); return; }
+        var el = e.target.closest ? e.target.closest('li[data-bookmark-id], .group-header') : null;
+        if (!el || !el.draggable) { e.preventDefault(); return; }
+
+        if (el.classList.contains('group-header')) {
+            var path = el.closest('.group-container').dataset.folder;
+            dragState = {
+                type: 'folder',
+                id: cachedFolderIds[path],
+                path: path,
+                sourceFolder: path.indexOf('/') === -1 ? '' : path.substring(0, path.lastIndexOf('/'))
+            };
+        } else {
+            dragState = {
+                type: 'bookmark',
+                id: el.dataset.bookmarkId,
+                sourceFolder: el.closest('.group-container').dataset.folder
+            };
+        }
+        e.dataTransfer.clearData();
+        e.dataTransfer.setData('text/plain', String(dragState.id));
+        e.dataTransfer.effectAllowed = 'move';
+
+        // Custom drag image: compact card with icon + title
+        var iconEl = el.querySelector('.favicon') || el.querySelector('img');
+        var labelEl = el.querySelector('.folder-name') || el.querySelector('a');
+
+        var ghost = document.createElement('div');
+        ghost.style.cssText = 'position:fixed;top:-1000px;left:-1000px;display:flex;align-items:center;gap:8px;' +
+            'max-width:240px;box-sizing:border-box;padding:6px 12px;' +
+            'background:var(--search-bg);color:var(--text-color);font:13px Segoe UI,sans-serif;' +
+            'border:1px solid var(--input-border);border-radius:8px;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,0.2);pointer-events:none;';
+
+        if (iconEl) {
+            var ghostIcon = iconEl.cloneNode(true);
+            ghostIcon.style.cssText = 'width:16px;height:16px;flex-shrink:0;';
+            if (el.classList.contains('group-header')) {
+                ghostIcon.style.filter = 'var(--icon-filter)';
+            }
+            ghost.appendChild(ghostIcon);
+        }
+
+        var ghostText = document.createElement('span');
+        ghostText.textContent = labelEl ? labelEl.textContent : '';
+        ghostText.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        ghost.appendChild(ghostText);
+
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 12, ghost.offsetHeight / 2);
+        setTimeout(function() { ghost.remove(); }, 0);
+
+        el.classList.add('dragging');
+    });
+
+    list.addEventListener('dragover', function(e) {
+        if (!dragState) return;
+        clearDropMarks();
+        var target = getDropTarget(e);
+        if (!target) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        target.el.classList.add('drop-' + target.position);
+    });
+
+    list.addEventListener('dragleave', function(e) {
+        if (!list.contains(e.relatedTarget)) clearDropMarks();
+    });
+
+    list.addEventListener('drop', function(e) {
+        if (!dragState) return;
+        e.preventDefault();
+        var target = getDropTarget(e);
+        var source = dragState;
+        clearDropMarks();
+        dragState = null;
+        if (target) moveTo(source, target);
+    });
+
+    list.addEventListener('dragend', function() {
+        clearDropMarks();
+        list.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
+        dragState = null;
     });
 }

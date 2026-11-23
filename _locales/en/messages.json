@@ -91,5 +91,23 @@
     },
     "trashFolder": {
         "message": "Trash"
+    },
+    "sortBrowserOrder": {
+        "message": "Order: as in browser"
+    },
+    "sortNewest": {
+        "message": "Order: newest first"
+    },
+    "sortOldest": {
+        "message": "Order: oldest first"
+    },
+    "sortAz": {
+        "message": "Order: A to Z"
+    },
+    "sortZa": {
+        "message": "Order: Z to A"
+    },
+    "menuTooltip": {
+        "message": "Menu"
     }
 }

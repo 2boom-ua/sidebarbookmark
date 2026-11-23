@@ -91,5 +91,23 @@
     },
     "trashFolder": {
         "message": "Кошик"
-    }
+    },
+    "sortBrowserOrder": {
+        "message": "Порядок: як у браузері"
+    },
+    "sortNewest": {
+        "message": "Порядок: спочатку нові"
+    },
+    "sortOldest": {
+        "message": "Порядок: спочатку старі"
+    },
+    "sortAz": {
+        "message": "Порядок: від А до Я"
+    },
+    "sortZa": {
+        "message": "Порядок: від Я до А"
+    },
+    "menuTooltip": {
+        "message": "Меню"
+    }    
 }
